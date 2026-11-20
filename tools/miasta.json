@@ -162,5 +162,15 @@
    "https://mkuran.pl/gtfs/gorzow_wlkp.zip"
   ],
   "attr": "MZK Gorzów Wlkp. (mkuran.pl)"
+ },
+ {
+  "id": "olsztyn",
+  "n": "Olsztyn",
+  "k": "Polska",
+  "generic": true,
+  "src": [
+   "https://cdn.zbiorkom.live/gtfs/olsztyn.zip"
+  ],
+  "attr": "ZDZiT Olsztyn (kopia: zbiorkom.live)"
  }
 ]
