@@ -155,16 +155,19 @@ def build(zip_path, out_dir, now=None, log=print, generic=False):
 
     # --- trasy, kursy ------------------------------------------------------
     route = {}
+    rtypes = {}
     for pre, z in zs:
         H, rd = rows(z, 'routes.txt')
         for x in rd:
             if not x:
                 continue
+            rtypes[x[H['route_type']]] = rtypes.get(x[H['route_type']], 0) + 1
             rid = pre + x[H['route_id']]
             short = x[H['route_short_name']] if 'route_short_name' in H else ''
             if not short and 'route_long_name' in H:
                 short = x[H['route_long_name']]
             route[rid] = (short or rid, kind(x[H['route_type']]))
+    log('linie wg route_type: ' + ', '.join('%s=%d(%s)' % (k, v, kind(k)) for k, v in sorted(rtypes.items())))
 
     services = []        # lista kalendarzy
     sidx = {}
@@ -282,6 +285,8 @@ def build(zip_path, out_dir, now=None, log=print, generic=False):
         index.append([g['n'], '' if k == g['n'].lower() else k, gm, g['lat'][:8], g['lon'][:8], poles])
     dump(os.path.join(out_dir, 'index.json'), {'v': version, 'gen': gen, 'end': end, 'g': index})
     log('zapisano: %d przystanków, %d słupków, wersja %s' % (len(index), num, version))
+    log('przystanki wg rodzaju: ' + ', '.join('%s=%d' % (n, sum(1 for g in index if g[2] & b))
+                                              for n, b in (('autobus', 1), ('tramwaj', 2), ('pociąg', 4), ('metro', 8))))
     return version
 
 
