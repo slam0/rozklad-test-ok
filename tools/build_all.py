@@ -24,10 +24,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_data
 
 UA = 'Rozklad-iOS6 (GitHub Actions)'
+BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
 MAX_ZIP = 400 * 1024 * 1024     # bezpiecznik: większego pliku nie bierzemy
 
 
-def fetch(src, dest, tries=4, log=print):
+def fetch(src, dest, tries=4, log=print, ua=None):
     """Pobiera src (adres http/https albo ścieżkę pliku) do dest. True gdy się udało."""
     if not src.startswith(('http://', 'https://')):
         try:
@@ -38,7 +39,7 @@ def fetch(src, dest, tries=4, log=print):
             return False
     for i in range(tries):
         try:
-            req = urllib.request.Request(src, headers={'User-Agent': UA})
+            req = urllib.request.Request(src, headers={'User-Agent': ua or UA})
             with urllib.request.urlopen(req, timeout=120) as r, open(dest, 'wb') as f:
                 n = 0
                 while True:
@@ -116,7 +117,7 @@ def main(cfg_path, out_dir, work_dir=None, log=print):
                     ok = False
                     break
             dest = os.path.join(work_dir, '%s-%d.zip' % (cid, i))
-            if not fetch(src, dest, log=log):
+            if not fetch(src, dest, log=log, ua=BROWSER_UA if c.get('browser') else None):
                 fb = c.get('fallback')
                 fb = os.path.join(base, fb) if fb else None
                 if fb and os.path.isfile(fb):
