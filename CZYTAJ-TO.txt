@@ -1,4 +1,4 @@
-Rozklad 2.0.0 - wiele miast (Warszawa, Gdansk, Krakow, Boston)
+Rozklad 2.0.0 - wiele miast (16 polskich miast)
 
 Co nowego:
 - Miasto i przystanki wybiera sie teraz W APLIKACJI (Wczytaj -> Wybierz miasto i przystanki),
@@ -16,7 +16,7 @@ Jak wgrac:
 
 Czego NIE sprawdzono:
 - Aplikacja nie byla uruchomiona na prawdziwym telefonie ani w symulatorze (tylko kompilacja i testy kodu w C/Pythonie).
-- Prawdziwe pliki Gdanska, Krakowa i Bostonu byly budowane tylko na sztucznych danych. Pierwsze prawdziwe
+- Prawdziwe pliki nowych miast byly budowane tylko na sztucznych danych. Pierwsze prawdziwe
   zbudowanie zrobi dopiero GitHub Actions - jesli ktores miasto wyjdzie zle, napisz co pokazuje log.
 - Poludniowy Tyrol: nie ma jeszcze zrodla danych (brak linku do GTFS), wiec go nie dodano.
 - Licencja danych Krakowa nie zostala sprawdzona.

@@ -159,6 +159,11 @@ void RZPresentCities(UIViewController *host)
                     if (name && ![k containsObject:name]) [k addObject:name];
                 }
                 _countries = k;
+                if ([k count] == 1) {       /* jeden kraj: pomijamy wybór kraju i od razu pokazujemy miasta */
+                    _cities = [self citiesOfCountry:[k objectAtIndex:0]];
+                    _citiesMode = YES;
+                    self.title = RZL(@"Wybierz miasto");
+                }
                 _msg.text = @"";
                 [self.tableView reloadData];
             } else {
@@ -181,6 +186,10 @@ void RZPresentCities(UIViewController *host)
 {
     NSMutableArray *out = [NSMutableArray array];
     for (NSDictionary *c in _cities) if ([[c objectForKey:@"k"] isEqualToString:country]) [out addObject:c];
+    /* miasta kraju po nazwie, a nie w kolejności z pliku */
+    [out sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+        return [[a objectForKey:@"n"] localizedCaseInsensitiveCompare:[b objectForKey:@"n"]];
+    }];
     return out;
 }
 

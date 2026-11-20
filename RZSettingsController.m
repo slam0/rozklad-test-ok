@@ -220,7 +220,7 @@ enum {
                 break;
             case DataOpenSite:
                 cell.textLabel.text = RZL(@"Wybierz miasto i przystanki");
-                cell.detailTextLabel.text = RZL(@"Warszawa, Gdańsk, Kraków, Boston…");
+                cell.detailTextLabel.text = RZL(@"Warszawa, Gdańsk, Kraków…");
                 cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
                 break;
             case DataRemoveExpired: {
