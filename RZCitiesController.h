@@ -7,8 +7,9 @@ NSString *RZSiteBase(void);
    Przy błędzie zwraca nil i opis po polsku w *reason (już przetłumaczony). */
 NSData *RZFetch(NSString *url, NSUInteger limit, NSString **reason);
 
-/* Pierwszy ekran: lista miast z miasta.json. Wyświetlać w UINavigationController. */
+/* Pierwszy ekran: kraje, drugi: miasta kraju (dane z miasta.json). Wyświetlać w UINavigationController. */
 @interface RZCitiesController : UITableViewController
+- (id)initWithCities:(NSArray *)cities base:(NSString *)base title:(NSString *)title;
 @end
 
 /* Otwiera wybór miasta i przystanków (okno z paskiem nawigacji) nad podanym kontrolerem. */

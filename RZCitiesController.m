@@ -71,21 +71,38 @@ void RZPresentCities(UIViewController *host)
 }
 
 @implementation RZCitiesController {
-    NSArray *_cities;               /* słowniki z miasta.json */
+    NSArray *_cities;               /* słowniki z miasta.json (w trybie miast: tylko miasta jednego kraju) */
+    NSArray *_countries;            /* tryb krajów: nazwy krajów w kolejności z listy */
     NSString *_base;
     UIActivityIndicatorView *_spin;
     UILabel *_msg;
     BOOL _loading;
+    BOOL _citiesMode;
+}
+
+/* Drugi krok: miasta jednego kraju (dane już pobrane, bez internetu) */
+- (id)initWithCities:(NSArray *)cities base:(NSString *)base title:(NSString *)title
+{
+    self = [super initWithStyle:UITableViewStylePlain];
+    if (self) {
+        _cities = cities;
+        _base = [base copy];
+        _citiesMode = YES;
+        self.title = title;
+    }
+    return self;
 }
 
 - (void)viewDidLoad
 {
     [super viewDidLoad];
-    self.title = RZL(@"Wybierz miasto");
+    RZStyleTable(self.tableView);
+    if (_citiesMode) return;
+
+    self.title = RZL(@"Wybierz kraj");
     self.navigationItem.leftBarButtonItem =
         [[UIBarButtonItem alloc] initWithTitle:RZL(@"Anuluj") style:UIBarButtonItemStyleBordered
                                         target:self action:@selector(cancelTapped)];
-    RZStyleTable(self.tableView);
 
     _spin = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
     _spin.center = CGPointMake(self.view.bounds.size.width / 2, 60);
@@ -136,6 +153,12 @@ void RZPresentCities(UIViewController *host)
             [_spin stopAnimating];
             if (list && [list count]) {
                 _cities = list;
+                NSMutableArray *k = [NSMutableArray array];
+                for (NSDictionary *c in list) {
+                    NSString *name = [c objectForKey:@"k"];
+                    if (name && ![k containsObject:name]) [k addObject:name];
+                }
+                _countries = k;
                 _msg.text = @"";
                 [self.tableView reloadData];
             } else {
@@ -154,21 +177,41 @@ void RZPresentCities(UIViewController *host)
     [self load];
 }
 
+- (NSArray *)citiesOfCountry:(NSString *)country
+{
+    NSMutableArray *out = [NSMutableArray array];
+    for (NSDictionary *c in _cities) if ([[c objectForKey:@"k"] isEqualToString:country]) [out addObject:c];
+    return out;
+}
+
 #pragma mark - Tabela
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tv { return 1; }
 
-- (NSInteger)tableView:(UITableView *)tv numberOfRowsInSection:(NSInteger)s { return (NSInteger)[_cities count]; }
+- (NSInteger)tableView:(UITableView *)tv numberOfRowsInSection:(NSInteger)s
+{
+    return _citiesMode ? (NSInteger)[_cities count] : (NSInteger)[_countries count];
+}
 
 - (UITableViewCell *)tableView:(UITableView *)tv cellForRowAtIndexPath:(NSIndexPath *)ip
 {
     UITableViewCell *cell = [tv dequeueReusableCellWithIdentifier:@"city"];
     if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"city"];
-    NSDictionary *c = [_cities objectAtIndex:ip.row];
-    cell.textLabel.text = [c objectForKey:@"n"];
-    NSNumber *s = [c objectForKey:@"s"];
-    cell.detailTextLabel.text = [NSString stringWithFormat:@"%@ · %@ %lu", [c objectForKey:@"k"], RZL(@"przystanków:"), (unsigned long)[s unsignedIntegerValue]];
     cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    cell.textLabel.textColor = RZCellTextColor();
+    cell.detailTextLabel.textColor = RZSubtleColor();
+    if (_citiesMode) {
+        NSDictionary *c = [_cities objectAtIndex:ip.row];
+        cell.textLabel.text = [c objectForKey:@"n"];
+        cell.detailTextLabel.text = [NSString stringWithFormat:@"%@ %lu", RZL(@"przystanków:"),
+                                     (unsigned long)[[c objectForKey:@"s"] unsignedIntegerValue]];
+    } else {
+        NSString *k = [_countries objectAtIndex:ip.row];
+        cell.textLabel.text = RZL(k);
+        NSMutableArray *names = [NSMutableArray array];
+        for (NSDictionary *c in [self citiesOfCountry:k]) [names addObject:[c objectForKey:@"n"]];
+        cell.detailTextLabel.text = [names componentsJoinedByString:@", "];
+    }
     return cell;
 }
 
@@ -177,10 +220,35 @@ void RZPresentCities(UIViewController *host)
     RZStyleCell(cell);
 }
 
+- (UIView *)tableView:(UITableView *)tv viewForHeaderInSection:(NSInteger)s
+{
+    return RZSectionHeaderView(_citiesMode ? RZL(@"Wybierz miasto:") : (_countries ? RZL(@"Wybierz kraj:") : @""));
+}
+
+- (CGFloat)tableView:(UITableView *)tv heightForHeaderInSection:(NSInteger)s
+{
+    return (_citiesMode || _countries) ? 34.0f : 0.0f;
+}
+
 - (void)tableView:(UITableView *)tv didSelectRowAtIndexPath:(NSIndexPath *)ip
 {
     [tv deselectRowAtIndexPath:ip animated:YES];
-    NSDictionary *c = [_cities objectAtIndex:ip.row];
+    if (!_citiesMode) {
+        NSString *k = [_countries objectAtIndex:ip.row];
+        NSArray *list = [self citiesOfCountry:k];
+        if ([list count] == 1) {            /* jedno miasto w kraju: od razu przystanki */
+            [self openCity:[list objectAtIndex:0]];
+            return;
+        }
+        RZCitiesController *c = [[RZCitiesController alloc] initWithCities:list base:_base title:RZL(k)];
+        [self.navigationController pushViewController:c animated:YES];
+        return;
+    }
+    [self openCity:[_cities objectAtIndex:ip.row]];
+}
+
+- (void)openCity:(NSDictionary *)c
+{
     NSString *u = [c objectForKey:@"u"];
     NSString *base = [_base stringByAppendingString:(u ? u : @"")];
     RZStopSearchController *sc = [[RZStopSearchController alloc] initWithCity:c baseURL:base];

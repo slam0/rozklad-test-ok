@@ -1,10 +1,12 @@
 #import "RZStopSearchController.h"
+#import <QuartzCore/QuartzCore.h>
 #import "RZCitiesController.h"
 #import "RZImportController.h"
 #import "RZLang.h"
 #import "RZViews.h"
 
-#define kMaxStops 20            /* tyle samo przystanków naraz, żeby pobieranie było krótkie */
+#define kMaxPerKind 10          /* tyle samo co w kreatorze na stronie */
+#define kMaxPoles 380           /* aplikacja przyjmuje do 400 słupków naraz */
 #define kMaxResults 120
 
 static NSString *Fold(NSString *s)
@@ -13,14 +15,14 @@ static NSString *Fold(NSString *s)
                                   locale:nil];
 }
 
-static NSString *KindsText(NSUInteger mask)
+static NSString *KindTitle(NSUInteger bit)
 {
-    NSMutableArray *a = [NSMutableArray array];
-    if (mask & 1) [a addObject:RZL(@"Autobus")];
-    if (mask & 2) [a addObject:RZL(@"Tramwaj")];
-    if (mask & 4) [a addObject:RZL(@"Pociąg")];
-    if (mask & 8) [a addObject:RZL(@"Metro")];
-    return [a componentsJoinedByString:@", "];
+    switch (bit) {
+        case 1:  return RZL(@"Autobusy");
+        case 2:  return RZL(@"Tramwaje");
+        case 4:  return RZL(@"Pociągi");
+        default: return RZL(@"Metro");
+    }
 }
 
 @implementation RZStopSearchController {
@@ -28,9 +30,15 @@ static NSString *KindsText(NSUInteger mask)
     NSString *_base;
     NSDictionary *_index;           /* cały index.json */
     NSArray *_groups;               /* index[@"g"] */
-    NSMutableArray *_folded;        /* nazwy bez ogonków, małymi literami (NSString) */
-    NSMutableArray *_selected;      /* numery grup w kolejności wyboru (NSNumber) */
+    NSMutableArray *_folded;        /* nazwy bez ogonków, małymi literami */
+    NSMutableArray *_steps;         /* rodzaje dostępne w mieście: NSNumber 1,2,4,8 */
+    NSMutableDictionary *_chosen;   /* rodzaj -> NSMutableArray numerów grup (NSNumber) */
+    NSInteger _step;
     NSArray *_shown;                /* numery grup widoczne na liście */
+    UIView *_bar;                   /* pasek kroków: kółko z numerem, nazwa rodzaju i liczba wybranych */
+    NSMutableArray *_btns;
+    NSMutableArray *_nameLabels;
+    NSMutableArray *_countLabels;
     UISearchBar *_search;
     UITableView *_table;
     UILabel *_msg;
@@ -44,19 +52,36 @@ static NSString *KindsText(NSUInteger mask)
     if (self) {
         _city = city;
         _base = [base copy];
-        _selected = [NSMutableArray array];
         _shown = [NSArray array];
+        _chosen = [NSMutableDictionary dictionary];
+        _steps = [NSMutableArray array];
+        NSUInteger mask = [[city objectForKey:@"m"] unsignedIntegerValue];
+        if (!mask) mask = 15;
+        for (NSUInteger bit = 1; bit <= 8; bit <<= 1) {
+            if (mask & bit) {
+                [_steps addObject:[NSNumber numberWithUnsignedInteger:bit]];
+                [_chosen setObject:[NSMutableArray array] forKey:[NSNumber numberWithUnsignedInteger:bit]];
+            }
+        }
+        if (![_steps count]) { [_steps addObject:[NSNumber numberWithInt:1]]; [_chosen setObject:[NSMutableArray array] forKey:[NSNumber numberWithInt:1]]; }
     }
     return self;
 }
+
+- (NSUInteger)bit { return [[_steps objectAtIndex:(NSUInteger)_step] unsignedIntegerValue]; }
+
+- (NSMutableArray *)list { return [_chosen objectForKey:[_steps objectAtIndex:(NSUInteger)_step]]; }
 
 - (void)viewDidLoad
 {
     [super viewDidLoad];
     self.title = [_city objectForKey:@"n"];
     self.view.backgroundColor = RZPaperColor();
+    CGFloat w = self.view.bounds.size.width;
 
-    _search = [[UISearchBar alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 44)];
+    [self buildBar:w];
+
+    _search = [[UISearchBar alloc] initWithFrame:CGRectMake(0, 58, w, 44)];
     _search.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _search.placeholder = RZL(@"Szukaj przystanku");
     _search.delegate = self;
@@ -65,7 +90,7 @@ static NSString *KindsText(NSUInteger mask)
     _search.userInteractionEnabled = NO;
     [self.view addSubview:_search];
 
-    _table = [[UITableView alloc] initWithFrame:CGRectMake(0, 44, self.view.bounds.size.width, self.view.bounds.size.height - 44)
+    _table = [[UITableView alloc] initWithFrame:CGRectMake(0, 102, w, self.view.bounds.size.height - 102)
                                           style:UITableViewStylePlain];
     _table.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     _table.dataSource = self;
@@ -74,11 +99,11 @@ static NSString *KindsText(NSUInteger mask)
     [self.view addSubview:_table];
 
     _spin = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
-    _spin.center = CGPointMake(self.view.bounds.size.width / 2, 100);
+    _spin.center = CGPointMake(w / 2, 140);
     _spin.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin;
     [self.view addSubview:_spin];
 
-    _msg = [[UILabel alloc] initWithFrame:CGRectMake(20, 130, self.view.bounds.size.width - 40, 160)];
+    _msg = [[UILabel alloc] initWithFrame:CGRectMake(20, 170, w - 40, 160)];
     _msg.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     _msg.backgroundColor = [UIColor clearColor];
     _msg.textColor = RZSubtleColor();
@@ -87,7 +112,7 @@ static NSString *KindsText(NSUInteger mask)
     _msg.font = [UIFont systemFontOfSize:15];
     [self.view addSubview:_msg];
 
-    [self updateButton];
+    [self updateHeader];
     [self load];
 }
 
@@ -134,20 +159,166 @@ static NSString *KindsText(NSUInteger mask)
     });
 }
 
+#pragma mark - Kroki
+
+- (NSUInteger)totalStops
+{
+    NSUInteger n = 0;
+    for (NSNumber *b in _steps) n += [[_chosen objectForKey:b] count];
+    return n;
+}
+
+- (void)updateHeader
+{
+    for (NSUInteger i = 0; i < [_steps count]; i++) {
+        BOOL on = ((NSInteger)i == _step);
+        UIButton *btn = [_btns objectAtIndex:i];
+        btn.backgroundColor = on ? RZBrownColor() : [UIColor colorWithRed:0.98f green:0.96f blue:0.90f alpha:1.0f];
+        UILabel *nl = [_nameLabels objectAtIndex:i];
+        UILabel *cl = [_countLabels objectAtIndex:i];
+        nl.textColor = on ? [UIColor whiteColor] : RZBrownColor();
+        cl.textColor = on ? [UIColor colorWithWhite:1.0f alpha:0.8f] : [UIColor colorWithWhite:0.45f alpha:1.0f];
+        NSUInteger n = [[_chosen objectForKey:[_steps objectAtIndex:i]] count];
+        cl.text = [NSString stringWithFormat:RZL(@"%lu wybr."), (unsigned long)n];
+    }
+    BOOL last = (_step == (NSInteger)[_steps count] - 1);
+    NSString *t = last ? [NSString stringWithFormat:@"%@ (%lu)", RZL(@"Pobierz"), (unsigned long)[self totalStops]] : RZL(@"Dalej");
+    UIBarButtonItem *b = [[UIBarButtonItem alloc] initWithTitle:t
+                                                          style:last ? UIBarButtonItemStyleDone : UIBarButtonItemStyleBordered
+                                                         target:self action:@selector(nextTapped)];
+    b.enabled = !last || [self totalStops] > 0;
+    self.navigationItem.rightBarButtonItem = b;
+}
+
+static UIColor *KindColor(NSUInteger bit)
+{
+    switch (bit) {
+        case 1:  return [UIColor colorWithRed:0.80f green:0.10f blue:0.18f alpha:1.0f];
+        case 2:  return [UIColor colorWithRed:0.13f green:0.45f blue:0.82f alpha:1.0f];
+        case 4:  return [UIColor colorWithRed:0.15f green:0.55f blue:0.25f alpha:1.0f];
+        default: return [UIColor colorWithRed:0.10f green:0.20f blue:0.55f alpha:1.0f];
+    }
+}
+
+/* Pasek kroków podobny do tego na stronie: kolorowe kółko z numerem, nazwa i liczba wybranych */
+- (void)buildBar:(CGFloat)w
+{
+    _bar = [[UIView alloc] initWithFrame:CGRectMake(0, 0, w, 58)];
+    _bar.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    _bar.backgroundColor = RZPaperColor();
+    _btns = [NSMutableArray array];
+    _nameLabels = [NSMutableArray array];
+    _countLabels = [NSMutableArray array];
+    for (NSUInteger i = 0; i < [_steps count]; i++) {
+        UIButton *b = [UIButton buttonWithType:UIButtonTypeCustom];
+        b.tag = (NSInteger)i;
+        b.layer.cornerRadius = 7.0f;
+        b.layer.borderWidth = 1.0f;
+        b.layer.borderColor = [UIColor colorWithWhite:0.0f alpha:0.25f].CGColor;
+        [b addTarget:self action:@selector(barTapped:) forControlEvents:UIControlEventTouchUpInside];
+
+        UILabel *num = [[UILabel alloc] init];
+        num.tag = 1;
+        num.backgroundColor = KindColor([[_steps objectAtIndex:i] unsignedIntegerValue]);
+        num.textColor = [UIColor whiteColor];
+        num.textAlignment = NSTextAlignmentCenter;
+        num.font = [UIFont boldSystemFontOfSize:12];
+        num.text = [NSString stringWithFormat:@"%lu", (unsigned long)(i + 1)];
+        num.layer.cornerRadius = 10.0f;
+        num.userInteractionEnabled = NO;
+        [b addSubview:num];
+
+        UILabel *nl = [[UILabel alloc] init];
+        nl.tag = 2;
+        nl.backgroundColor = [UIColor clearColor];
+        nl.textAlignment = NSTextAlignmentCenter;
+        nl.font = [UIFont boldSystemFontOfSize:12];
+        nl.adjustsFontSizeToFitWidth = YES;
+        nl.minimumScaleFactor = 0.7f;
+        nl.text = KindTitle([[_steps objectAtIndex:i] unsignedIntegerValue]);
+        nl.userInteractionEnabled = NO;
+        [b addSubview:nl];
+
+        UILabel *cl = [[UILabel alloc] init];
+        cl.tag = 3;
+        cl.backgroundColor = [UIColor clearColor];
+        cl.textAlignment = NSTextAlignmentCenter;
+        cl.font = [UIFont systemFontOfSize:10];
+        cl.userInteractionEnabled = NO;
+        [b addSubview:cl];
+
+        [_bar addSubview:b];
+        [_btns addObject:b];
+        [_nameLabels addObject:nl];
+        [_countLabels addObject:cl];
+    }
+    [self.view addSubview:_bar];
+    [self layoutBar];
+}
+
+- (void)layoutBar
+{
+    CGFloat w = self.view.bounds.size.width;
+    NSUInteger n = [_btns count];
+    if (!n) return;
+    CGFloat gap = 4.0f, bw = (w - 16.0f - gap * (n - 1)) / n;
+    for (NSUInteger i = 0; i < n; i++) {
+        UIButton *b = [_btns objectAtIndex:i];
+        b.frame = CGRectMake(8.0f + i * (bw + gap), 4.0f, bw, 50.0f);
+        [b viewWithTag:1].frame = CGRectMake((bw - 20.0f) / 2.0f, 3.0f, 20.0f, 20.0f);
+        [b viewWithTag:2].frame = CGRectMake(2.0f, 24.0f, bw - 4.0f, 14.0f);
+        [b viewWithTag:3].frame = CGRectMake(2.0f, 37.0f, bw - 4.0f, 12.0f);
+    }
+}
+
+- (void)viewDidLayoutSubviews
+{
+    [super viewDidLayoutSubviews];
+    [self layoutBar];
+}
+
+- (void)barTapped:(UIButton *)b
+{
+    if (b.tag == _step) return;
+    _step = b.tag;
+    _search.text = @"";
+    [self updateHeader];
+    [self refilter];
+}
+
+- (void)scrollViewWillBeginDragging:(UIScrollView *)sv
+{
+    [_search resignFirstResponder];     /* klawiatura zasłania listę, więc chowa się przy przewijaniu */
+}
+
+- (void)nextTapped
+{
+    if (_step < (NSInteger)[_steps count] - 1) {
+        _step++;
+        _search.text = @"";
+        [self updateHeader];
+        [self refilter];
+    } else {
+        [self downloadTapped];
+    }
+}
+
 #pragma mark - Filtr
 
 - (void)refilter
 {
+    NSUInteger bit = [self bit];
     NSString *q = [Fold([_search.text length] ? _search.text : @"")
                       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
     NSMutableArray *out = [NSMutableArray array];
     NSString *note = @"";
     if ([q length] < 2) {
-        [out addObjectsFromArray:_selected];
-        note = [_selected count] ? @"" : RZL(@"Wpisz co najmniej 2 litery nazwy przystanku.");
+        [out addObjectsFromArray:[self list]];
+        note = [[self list] count] ? @"" : RZL(@"Wpisz co najmniej 2 litery nazwy przystanku.");
     } else {
         for (int pass = 0; pass < 2 && [out count] < kMaxResults; pass++) {
             for (NSUInteger i = 0; i < [_groups count] && [out count] < kMaxResults; i++) {
+                if (!([[[_groups objectAtIndex:i] objectAtIndex:2] unsignedIntegerValue] & bit)) continue;
                 NSString *k = [_folded objectAtIndex:i];
                 NSRange r = [k rangeOfString:q];
                 if (r.location == NSNotFound) continue;
@@ -160,7 +331,7 @@ static NSString *KindsText(NSUInteger mask)
     }
     _shown = out;
     _msg.text = note;
-    _msg.frame = CGRectMake(20, 60, self.view.bounds.size.width - 40, 100);
+    _msg.frame = CGRectMake(20, 140, self.view.bounds.size.width - 40, 100);
     _msg.hidden = ([note length] == 0);
     [_table reloadData];
 }
@@ -175,25 +346,7 @@ static NSString *KindsText(NSUInteger mask)
     [sb resignFirstResponder];
 }
 
-#pragma mark - Wybór
-
-- (NSUInteger)selectedPoleCount
-{
-    NSUInteger n = 0;
-    for (NSNumber *gi in _selected) n += [[[_groups objectAtIndex:[gi unsignedIntegerValue]] objectAtIndex:5] count];
-    return n;
-}
-
-- (void)updateButton
-{
-    if ([_selected count] == 0) {
-        self.navigationItem.rightBarButtonItem = nil;
-        return;
-    }
-    NSString *t = [NSString stringWithFormat:@"%@ (%lu)", RZL(@"Pobierz"), (unsigned long)[_selected count]];
-    self.navigationItem.rightBarButtonItem =
-        [[UIBarButtonItem alloc] initWithTitle:t style:UIBarButtonItemStyleDone target:self action:@selector(downloadTapped)];
-}
+#pragma mark - Tabela
 
 - (NSInteger)tableView:(UITableView *)tv numberOfRowsInSection:(NSInteger)s { return (NSInteger)[_shown count]; }
 
@@ -201,18 +354,21 @@ static NSString *KindsText(NSUInteger mask)
 {
     UITableViewCell *cell = [tv dequeueReusableCellWithIdentifier:@"stop"];
     if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:@"stop"];
+    NSUInteger bit = [self bit];
     NSNumber *gi = [_shown objectAtIndex:ip.row];
     NSArray *g = [_groups objectAtIndex:[gi unsignedIntegerValue]];
     cell.textLabel.text = [g objectAtIndex:0];
     NSMutableArray *codes = [NSMutableArray array];
     for (NSArray *p in [g objectAtIndex:5]) {
+        if (!([[p objectAtIndex:2] unsignedIntegerValue] & bit)) continue;
         NSString *c = [p count] > 1 ? [NSString stringWithFormat:@"%@", [p objectAtIndex:1]] : @"";
         if ([c length]) [codes addObject:c];
-        if ([codes count] >= 6) break;
+        if ([codes count] >= 8) break;
     }
-    NSString *kinds = KindsText([[g objectAtIndex:2] unsignedIntegerValue]);
-    cell.detailTextLabel.text = [codes count] ? [NSString stringWithFormat:@"%@ · %@", kinds, [codes componentsJoinedByString:@", "]] : kinds;
-    cell.accessoryType = [_selected containsObject:gi] ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
+    cell.detailTextLabel.text = [codes count] ? [NSString stringWithFormat:@"%@ %@", RZL(@"słupki:"), [codes componentsJoinedByString:@", "]] : @"";
+    cell.textLabel.textColor = RZCellTextColor();
+    cell.detailTextLabel.textColor = RZSubtleColor();
+    cell.accessoryType = [[self list] containsObject:gi] ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
     return cell;
 }
 
@@ -221,34 +377,74 @@ static NSString *KindsText(NSUInteger mask)
     RZStyleCell(cell);
 }
 
+- (UIView *)tableView:(UITableView *)tv viewForHeaderInSection:(NSInteger)s
+{
+    NSString *t = [NSString stringWithFormat:RZL(@"%@: wybrano %lu z %d"), KindTitle([self bit]), (unsigned long)[[self list] count], kMaxPerKind];
+    return RZSectionHeaderView(t);
+}
+
+- (CGFloat)tableView:(UITableView *)tv heightForHeaderInSection:(NSInteger)s { return 34.0f; }
+
+- (UIView *)tableView:(UITableView *)tv viewForFooterInSection:(NSInteger)s
+{
+    NSString *a = [_city objectForKey:@"a"];
+    return [a length] ? RZSectionFooterView([NSString stringWithFormat:RZL(@"Dane: %@"), a]) : nil;
+}
+
+- (CGFloat)tableView:(UITableView *)tv heightForFooterInSection:(NSInteger)s
+{
+    return [[_city objectForKey:@"a"] length] ? 44.0f : 0.0f;
+}
+
 - (void)tableView:(UITableView *)tv didSelectRowAtIndexPath:(NSIndexPath *)ip
 {
     [tv deselectRowAtIndexPath:ip animated:YES];
     NSNumber *gi = [_shown objectAtIndex:ip.row];
-    if ([_selected containsObject:gi]) {
-        [_selected removeObject:gi];
+    NSMutableArray *list = [self list];
+    if ([list containsObject:gi]) {
+        [list removeObject:gi];
     } else {
-        NSUInteger poles = [[[_groups objectAtIndex:[gi unsignedIntegerValue]] objectAtIndex:5] count];
-        if ([_selected count] >= kMaxStops || [self selectedPoleCount] + poles > 380) {
+        if ([list count] >= kMaxPerKind || [[self planPoles] count] + [self polesOfGroup:gi forBit:[self bit]] > kMaxPoles) {
             UIAlertView *a = [[UIAlertView alloc] initWithTitle:RZL(@"Za dużo przystanków")
-                                                        message:[NSString stringWithFormat:RZL(@"Naraz można wybrać do %d przystanków. Odznacz któryś, żeby dodać nowy."), kMaxStops]
+                                                        message:[NSString stringWithFormat:RZL(@"W jednym kroku można wybrać do %d przystanków. Odznacz któryś, żeby dodać nowy."), kMaxPerKind]
                                                        delegate:nil cancelButtonTitle:@"OK" otherButtonTitles:nil];
             [a show];
             return;
         }
-        [_selected addObject:gi];
+        [list addObject:gi];
     }
-    [self updateButton];
-    [tv reloadRowsAtIndexPaths:[NSArray arrayWithObject:ip] withRowAnimation:UITableViewRowAnimationNone];
-}
-
-- (NSString *)tableView:(UITableView *)tv titleForFooterInSection:(NSInteger)s
-{
-    NSString *a = [_city objectForKey:@"a"];
-    return [a length] ? [NSString stringWithFormat:RZL(@"Dane: %@"), a] : nil;
+    [self updateHeader];
+    [tv reloadData];
 }
 
 #pragma mark - Pobieranie
+
+- (NSUInteger)polesOfGroup:(NSNumber *)gi forBit:(NSUInteger)bit
+{
+    NSUInteger n = 0;
+    for (NSArray *p in [[_groups objectAtIndex:[gi unsignedIntegerValue]] objectAtIndex:5])
+        if ([[p objectAtIndex:2] unsignedIntegerValue] & bit) n++;
+    return n;
+}
+
+/* Jak plan() w kreatorze: słupki z wybranych przystanków, tylko te obsługujące dany rodzaj,
+   a ten sam słupek w kilku rodzajach dostaje sumę bitów. Zwraca słownik numer -> maska i kolejność w _planOrder. */
+- (NSDictionary *)planPoles
+{
+    NSMutableDictionary *mask = [NSMutableDictionary dictionary];
+    for (NSNumber *b in _steps) {
+        NSUInteger bit = [b unsignedIntegerValue];
+        for (NSNumber *gi in [_chosen objectForKey:b]) {
+            for (NSArray *p in [[_groups objectAtIndex:[gi unsignedIntegerValue]] objectAtIndex:5]) {
+                if (!([[p objectAtIndex:2] unsignedIntegerValue] & bit)) continue;
+                NSNumber *num = [p objectAtIndex:0];
+                NSUInteger old = [[mask objectForKey:num] unsignedIntegerValue];
+                [mask setObject:[NSNumber numberWithUnsignedInteger:old | bit] forKey:num];
+            }
+        }
+    }
+    return mask;
+}
 
 static NSString *Escape(NSString *s)
 {
@@ -258,24 +454,13 @@ static NSString *Escape(NSString *s)
 
 - (void)downloadTapped
 {
-    if (![_selected count]) return;
+    NSDictionary *mask = [self planPoles];
+    if (![mask count]) return;
     [_search resignFirstResponder];
 
-    /* ten sam słupek może należeć do kilku przystanków: łączymy rodzaje (jak robił to kreator na stronie) */
-    NSMutableDictionary *mask = [NSMutableDictionary dictionary];
-    NSMutableArray *order = [NSMutableArray array];
-    for (NSNumber *gi in _selected) {
-        NSArray *g = [_groups objectAtIndex:[gi unsignedIntegerValue]];
-        for (NSArray *p in [g objectAtIndex:5]) {
-            NSNumber *num = [p objectAtIndex:0];
-            NSUInteger m = [[p objectAtIndex:2] unsignedIntegerValue];
-            NSNumber *old = [mask objectForKey:num];
-            if (!old) [order addObject:num];
-            [mask setObject:[NSNumber numberWithUnsignedInteger:m | [old unsignedIntegerValue]] forKey:num];
-        }
-    }
+    NSArray *nums = [[mask allKeys] sortedArrayUsingSelector:@selector(compare:)];
     NSMutableArray *parts = [NSMutableArray array];
-    for (NSNumber *n in order) [parts addObject:[NSString stringWithFormat:@"%@.%@", n, [mask objectForKey:n]]];
+    for (NSNumber *n in nums) [parts addObject:[NSString stringWithFormat:@"%@.%@", n, [mask objectForKey:n]]];
     NSString *url = [NSString stringWithFormat:@"rozklad://import?u=%@&v=%@&p=%@",
                      Escape(_base), [_index objectForKey:@"v"], [parts componentsJoinedByString:@","]];
 
