@@ -1,7 +1,7 @@
 # Rozkład
 
 Aplikacja Rozkład pozwala załadować rozkład jazdy autobusów, tramwajów, pociągów i metra na telefon z iOS 6.x.x.
-Miasta: Warszawa, Gdańsk, Kraków, Poznań, Wrocław, Szczecin, Katowice i GZM, Bydgoszcz, Lublin, Białystok, Toruń, Rzeszów, Kielce, Radom, Elbląg, Gorzów Wielkopolski (kolejne w przygotowaniu).
+Miasta: Warszawa, Gdańsk, Kraków, Poznań, Szczecin, Katowice i GZM, Bydgoszcz, Lublin, Białystok, Toruń, Rzeszów, Kielce, Radom, Elbląg, Gorzów Wielkopolski (kolejne w przygotowaniu).
 
 Aplikacja działa offline\*.
 
@@ -31,7 +31,7 @@ Repozytorium do Cydii zostanie niedługo upublicznione.
 - Warszawa: ZTM Warszawa, udostępnia [mkuran.pl](https://mkuran.pl)
 - Gdańsk: ZTM Gdańsk, licencja CC BY 4.0
 - Katowice i GZM: ZTM GZM (CC BY 4.0), przetworzył Mikołaj Kuranowski
-- Poznań: ZTM Poznań; Wrocław: UM Wrocław / MPK Wrocław; Szczecin: ZDiTM Szczecin; Białystok: Białostocka Komunikacja Miejska
+- Poznań: ZTM Poznań; Szczecin: ZDiTM Szczecin; Białystok: Białostocka Komunikacja Miejska
 - Bydgoszcz, Lublin, Toruń, Radom, Elbląg, Gorzów Wielkopolski, Rzeszów, Kielce: dane miast w wersji przetworzonej przez [mkuran.pl](https://mkuran.pl/gtfs). Dane Rzeszowa i Kielc zostały przetworzone, a miasta nie odpowiadają za ich przetwarzanie ani ponowne użycie.
 - Kraków: ZTP Kraków
 
