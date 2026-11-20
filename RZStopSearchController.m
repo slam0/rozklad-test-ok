@@ -218,7 +218,7 @@ static UIColor *KindColor(NSUInteger bit)
         [b addTarget:self action:@selector(barTapped:) forControlEvents:UIControlEventTouchUpInside];
 
         UILabel *num = [[UILabel alloc] init];
-        num.tag = 1;
+        num.tag = 101;
         num.backgroundColor = KindColor([[_steps objectAtIndex:i] unsignedIntegerValue]);
         num.textColor = [UIColor whiteColor];
         num.textAlignment = NSTextAlignmentCenter;
@@ -229,7 +229,7 @@ static UIColor *KindColor(NSUInteger bit)
         [b addSubview:num];
 
         UILabel *nl = [[UILabel alloc] init];
-        nl.tag = 2;
+        nl.tag = 102;
         nl.backgroundColor = [UIColor clearColor];
         nl.textAlignment = NSTextAlignmentCenter;
         nl.font = [UIFont boldSystemFontOfSize:12];
@@ -240,7 +240,7 @@ static UIColor *KindColor(NSUInteger bit)
         [b addSubview:nl];
 
         UILabel *cl = [[UILabel alloc] init];
-        cl.tag = 3;
+        cl.tag = 103;
         cl.backgroundColor = [UIColor clearColor];
         cl.textAlignment = NSTextAlignmentCenter;
         cl.font = [UIFont systemFontOfSize:10];
@@ -265,9 +265,9 @@ static UIColor *KindColor(NSUInteger bit)
     for (NSUInteger i = 0; i < n; i++) {
         UIButton *b = [_btns objectAtIndex:i];
         b.frame = CGRectMake(8.0f + i * (bw + gap), 4.0f, bw, 50.0f);
-        [b viewWithTag:1].frame = CGRectMake((bw - 20.0f) / 2.0f, 3.0f, 20.0f, 20.0f);
-        [b viewWithTag:2].frame = CGRectMake(2.0f, 24.0f, bw - 4.0f, 14.0f);
-        [b viewWithTag:3].frame = CGRectMake(2.0f, 37.0f, bw - 4.0f, 12.0f);
+        [b viewWithTag:101].frame = CGRectMake((bw - 20.0f) / 2.0f, 3.0f, 20.0f, 20.0f);
+        [b viewWithTag:102].frame = CGRectMake(2.0f, 24.0f, bw - 4.0f, 14.0f);
+        [b viewWithTag:103].frame = CGRectMake(2.0f, 37.0f, bw - 4.0f, 12.0f);
     }
 }
 
@@ -314,7 +314,14 @@ static UIColor *KindColor(NSUInteger bit)
     NSString *note = @"";
     if ([q length] < 2) {
         [out addObjectsFromArray:[self list]];
-        note = [[self list] count] ? @"" : RZL(@"Wpisz co najmniej 2 litery nazwy przystanku.");
+        if ([[self list] count]) {
+            note = @"";
+        } else {
+            NSString *a = [_city objectForKey:@"a"];
+            note = [a length] ? [NSString stringWithFormat:@"%@\n\n%@", RZL(@"Wpisz co najmniej 2 litery nazwy przystanku."),
+                                 [NSString stringWithFormat:RZL(@"Dane: %@"), a]]
+                              : RZL(@"Wpisz co najmniej 2 litery nazwy przystanku.");
+        }
     } else {
         for (int pass = 0; pass < 2 && [out count] < kMaxResults; pass++) {
             for (NSUInteger i = 0; i < [_groups count] && [out count] < kMaxResults; i++) {
@@ -331,7 +338,7 @@ static UIColor *KindColor(NSUInteger bit)
     }
     _shown = out;
     _msg.text = note;
-    _msg.frame = CGRectMake(20, 140, self.view.bounds.size.width - 40, 100);
+    _msg.frame = CGRectMake(20, 124, self.view.bounds.size.width - 40, 120);
     _msg.hidden = ([note length] == 0);
     [_table reloadData];
 }
@@ -377,23 +384,34 @@ static UIColor *KindColor(NSUInteger bit)
     RZStyleCell(cell);
 }
 
+- (BOOL)showingSelected
+{
+    NSString *q = [_search.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    return [q length] < 2 && [[self list] count] > 0;
+}
+
 - (UIView *)tableView:(UITableView *)tv viewForHeaderInSection:(NSInteger)s
 {
+    if (![self showingSelected]) return nil;
     NSString *t = [NSString stringWithFormat:RZL(@"%@: wybrano %lu z %d"), KindTitle([self bit]), (unsigned long)[[self list] count], kMaxPerKind];
     return RZSectionHeaderView(t);
 }
 
-- (CGFloat)tableView:(UITableView *)tv heightForHeaderInSection:(NSInteger)s { return 34.0f; }
+- (CGFloat)tableView:(UITableView *)tv heightForHeaderInSection:(NSInteger)s
+{
+    return [self showingSelected] ? 34.0f : 0.0f;
+}
 
 - (UIView *)tableView:(UITableView *)tv viewForFooterInSection:(NSInteger)s
 {
     NSString *a = [_city objectForKey:@"a"];
-    return [a length] ? RZSectionFooterView([NSString stringWithFormat:RZL(@"Dane: %@"), a]) : nil;
+    if (![_shown count] || ![a length]) return nil;
+    return RZSectionFooterView([NSString stringWithFormat:RZL(@"Dane: %@"), a]);
 }
 
 - (CGFloat)tableView:(UITableView *)tv heightForFooterInSection:(NSInteger)s
 {
-    return [[_city objectForKey:@"a"] length] ? 44.0f : 0.0f;
+    return ([_shown count] && [[_city objectForKey:@"a"] length]) ? 44.0f : 0.0f;
 }
 
 - (void)tableView:(UITableView *)tv didSelectRowAtIndexPath:(NSIndexPath *)ip
