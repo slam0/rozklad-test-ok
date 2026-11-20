@@ -12,9 +12,11 @@ Miasto z "required": true musi się udać, z pozostałych błędnego pomijamy (s
 """
 import json
 import os
+import re
 import shutil
 import sys
 import time
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
@@ -54,6 +56,37 @@ def fetch(src, dest, tries=4, log=print):
     return False
 
 
+def pick_newest(urls, today=None):
+    """Z adresów plików z datą w nazwie (GTFS_2025_12_01.zip) wybiera ostatni, który już obowiązuje.
+    Gdy żaden jeszcze nie obowiązuje, bierze najstarszy z przyszłych."""
+    today = today or datetime.now(timezone.utc).strftime('%Y%m%d')
+    dated = []
+    for u in urls:
+        m = re.search(r'(20\d\d)[_.-]?(\d\d)[_.-]?(\d\d)', os.path.basename(urllib.parse.urlparse(u).path))
+        if m:
+            dated.append((''.join(m.groups()), u))
+    if not dated:
+        return None
+    dated.sort()
+    started = [d for d in dated if d[0] <= today]
+    return (started[-1] if started else dated[0])[1]
+
+
+def resolve_listing(spec, log=print):
+    """Strona z listą plików z datami w nazwach (bez stałego adresu): znajduje adres najnowszego pliku."""
+    page = os.path.join(os.environ.get('TMPDIR', '/tmp'), 'rozklad-listing.html')
+    if not fetch(spec['listing'], page, log=log):
+        return None
+    with open(page, encoding='utf-8', errors='replace') as f:
+        html = f.read()
+    rx = re.compile(spec.get('match', r'\.zip'), re.I)
+    urls = [urllib.parse.urljoin(spec['listing'], h) for h in re.findall(r'href=["\']([^"\']+)["\']', html, re.I)]
+    urls = [u for u in urls if rx.search(u) and u.lower().split('?')[0].endswith('.zip')]
+    best = pick_newest(urls)
+    log('  na liście %d plików, wybrano: %s' % (len(urls), best))
+    return best
+
+
 def copy_into(src_dir, dst_dir):
     for root, _, files in os.walk(src_dir):
         rel = os.path.relpath(root, src_dir)
@@ -77,6 +110,11 @@ def main(cfg_path, out_dir, work_dir=None, log=print):
         zips = []
         ok = True
         for i, src in enumerate(c['src']):
+            if isinstance(src, dict):           # {"listing": adres strony, "match": wyrażenie}
+                src = resolve_listing(src, log=log)
+                if not src:
+                    ok = False
+                    break
             dest = os.path.join(work_dir, '%s-%d.zip' % (cid, i))
             if not fetch(src, dest, log=log):
                 fb = c.get('fallback')

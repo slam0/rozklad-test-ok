@@ -169,8 +169,11 @@
   "k": "Polska",
   "generic": true,
   "src": [
-   "https://cdn.zbiorkom.live/gtfs/olsztyn.zip"
+   {
+    "listing": "https://zdzit.olsztyn.eu/gtfs/",
+    "match": "GTFS"
+   }
   ],
-  "attr": "ZDZiT Olsztyn (kopia: zbiorkom.live)"
+  "attr": "ZDZiT Olsztyn"
  }
 ]

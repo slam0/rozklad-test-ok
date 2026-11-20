@@ -33,6 +33,14 @@ class All(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(out, cid, 'd', v, 'svc.json')))
         self.assertEqual([c for c in m['c'] if c['id'] == 'krakow'][0]['m'], 1 | 2)   # autobus + tramwaj
 
+    def test_wybor_najnowszego_pliku_z_listy(self):
+        urls = ['https://x.pl/g/GTFS_2025_10_01.zip', 'https://x.pl/g/GTFS_2025_12_01_0.zip',
+                'https://x.pl/g/GTFS_2025_11_01.zip', 'https://x.pl/g/GTFS_2026_01_15.zip', 'https://x.pl/g/inny.zip']
+        self.assertEqual(build_all.pick_newest(urls, '20251215'), 'https://x.pl/g/GTFS_2025_12_01_0.zip')
+        self.assertEqual(build_all.pick_newest(urls, '20260201'), 'https://x.pl/g/GTFS_2026_01_15.zip')
+        self.assertEqual(build_all.pick_newest(urls, '20250101'), 'https://x.pl/g/GTFS_2025_10_01.zip')
+        self.assertIsNone(build_all.pick_newest(['https://x.pl/a.zip']))
+
     def test_wymagane_miasto_przerywa(self):
         d = tempfile.mkdtemp()
         cfg = os.path.join(d, 'tools', 'miasta.json'); os.makedirs(os.path.dirname(cfg))

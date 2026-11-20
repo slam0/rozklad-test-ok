@@ -31,7 +31,7 @@ Repozytorium do Cydii zostanie niedługo upublicznione.
 - Warszawa: ZTM Warszawa, udostępnia [mkuran.pl](https://mkuran.pl)
 - Gdańsk: ZTM Gdańsk, licencja CC BY 4.0
 - Katowice i GZM: ZTM GZM (CC BY 4.0), przetworzył Mikołaj Kuranowski
-- Olsztyn: ZDZiT Olsztyn (przez kopię zbiorkom.live)
+- Olsztyn: ZDZiT Olsztyn
 - Poznań: ZTM Poznań; Wrocław: UM Wrocław / MPK Wrocław; Szczecin: ZDiTM Szczecin; Białystok: Białostocka Komunikacja Miejska
 - Bydgoszcz, Lublin, Toruń, Radom, Elbląg, Gorzów Wielkopolski, Rzeszów, Kielce: dane miast w wersji przetworzonej przez [mkuran.pl](https://mkuran.pl/gtfs). Dane Rzeszowa i Kielc zostały przetworzone, a miasta nie odpowiadają za ich przetwarzanie ani ponowne użycie.
 - Kraków: ZTP Kraków
