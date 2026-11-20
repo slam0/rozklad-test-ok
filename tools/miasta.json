@@ -1,0 +1,14 @@
+[
+  {"id": "warszawa", "n": "Warszawa", "k": "Polska", "root": true, "required": true, "generic": false,
+   "src": ["https://mkuran.pl/gtfs/warsaw.zip"], "fallback": "dane/warsaw.zip",
+   "attr": "ZTM Warszawa (mkuran.pl)"},
+  {"id": "gdansk", "n": "Gdańsk", "k": "Polska", "generic": true,
+   "src": ["https://ckan.multimediagdansk.pl/dataset/c24aa637-3619-4dc2-a171-a23eec8f2172/resource/30e783e4-2bec-4a7d-bb22-ee3e3b26ca96/download/gtfsgoogle.zip"],
+   "attr": "ZTM Gdańsk, CC BY 4.0"},
+  {"id": "krakow", "n": "Kraków", "k": "Polska", "generic": true,
+   "src": ["https://gtfs.ztp.krakow.pl/GTFS_KRK_A.zip", "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip"],
+   "attr": "ZTP Kraków"},
+  {"id": "boston", "n": "Boston", "k": "USA", "generic": true,
+   "src": ["https://cdn.mbta.com/MBTA_GTFS.zip"],
+   "attr": "MBTA / MassDOT"}
+]

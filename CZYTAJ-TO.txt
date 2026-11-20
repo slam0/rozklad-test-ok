@@ -1,0 +1,28 @@
+Rozklad 2.0.0 - wiele miast (Warszawa, Gdansk, Krakow, Boston)
+
+Co nowego:
+- Miasto i przystanki wybiera sie teraz W APLIKACJI (Wczytaj -> Wybierz miasto i przystanki),
+  bez strony w Safari. Nowe ekrany: RZCitiesController.m, RZStopSearchController.m.
+- Dane miast buduje GitHub Actions (tools/build_all.py + tools/miasta.json). Surowe pliki GTFS sa
+  pobierane tylko na czas budowania, na strone trafiaja male pliki (index.json, d/...).
+  Warszawa jest w katalogu glownym strony (zgodnosc ze starymi wersjami), reszta w podfolderach.
+- Jedno miasto na raz: wczytanie innego zastepuje poprzednie dane.
+
+Jak wgrac:
+1. Wgraj CALA zawartosc do repozytorium slam0/Rozklad (razem z folderem .github i .gitignore).
+2. Actions -> "Zbuduj aplikacje" -> Run workflow, potem "Strona" (strona.yml), jesli sie sama nie uruchomi.
+3. W logu "Strona" zobacz, ktore miasta sie zbudowaly (miasta pominiete pisze jako "POMIJAM").
+   Sprawdz tez rozmiar strony (limit GitHub Pages ok. 1 GB).
+
+Czego NIE sprawdzono:
+- Aplikacja nie byla uruchomiona na prawdziwym telefonie ani w symulatorze (tylko kompilacja i testy kodu w C/Pythonie).
+- Prawdziwe pliki Gdanska, Krakowa i Bostonu byly budowane tylko na sztucznych danych. Pierwsze prawdziwe
+  zbudowanie zrobi dopiero GitHub Actions - jesli ktores miasto wyjdzie zle, napisz co pokazuje log.
+- Poludniowy Tyrol: nie ma jeszcze zrodla danych (brak linku do GTFS), wiec go nie dodano.
+- Licencja danych Krakowa nie zostala sprawdzona.
+
+Repozytorium testowe (zeby nie upubliczniac od razu):
+- Adres strony w aplikacji wpisuje sie sam przy budowaniu na GitHubie (z nazwy repozytorium),
+  wiec ta sama paczka dziala w kazdym repozytorium: aplikacja z repo "Rozklad-test" pobiera dane
+  ze strony "Rozklad-test", a nie z glownej.
+- W nowym repozytorium: Settings -> Pages -> Source: GitHub Actions.
